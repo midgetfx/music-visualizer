@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Visualizer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Music Visualizer</h1>
+        </header>
+        
+        <div class="control-panel">
+            <div class="file-input-wrapper">
+                <input type="file" id="audioFile" accept="audio/*" class="file-input">
+                <label for="audioFile" class="file-label">음악 파일 선택</label>
+            </div>
+            
+            <div class="controls">
+                <button id="playBtn" class="btn" disabled>재생</button>
+                <button id="pauseBtn" class="btn" disabled>일시정지</button>
+                <button id="stopBtn" class="btn" disabled>정지</button>
+            </div>
+            
+            <div class="recording-controls">
+                <button id="downloadVideoBtn" class="btn download-btn" disabled>영상 다운로드</button>
+                <button id="downloadTransparentBtn" class="btn transparent-btn" disabled>투명 영상 다운로드</button>
+            </div>
+        </div>
+        
+        <div class="settings-panel">
+            <div class="settings-section">
+                <h3>시각화 모드</h3>
+                <div class="mode-selector">
+                    <input type="radio" id="barMode" name="visualMode" value="bar" checked>
+                    <label for="barMode" class="mode-label">바</label>
+                    
+                    <input type="radio" id="waveMode" name="visualMode" value="wave">
+                    <label for="waveMode" class="mode-label">웨이브</label>
+                    
+                    <input type="radio" id="circleMode" name="visualMode" value="circle">
+                    <label for="circleMode" class="mode-label">원형</label>
+                    
+                    <input type="radio" id="particleMode" name="visualMode" value="particle">
+                    <label for="particleMode" class="mode-label">파티클</label>
+                    
+                    <input type="radio" id="spectrumMode" name="visualMode" value="spectrum">
+                    <label for="spectrumMode" class="mode-label">스펙트럼</label>
+                    
+                    <input type="radio" id="spiralMode" name="visualMode" value="spiral">
+                    <label for="spiralMode" class="mode-label">나선형</label>
+                    
+                    <input type="radio" id="mirrorMode" name="visualMode" value="mirror">
+                    <label for="mirrorMode" class="mode-label">미러</label>
+                    
+                    <input type="radio" id="dnaMode" name="visualMode" value="dna">
+                    <label for="dnaMode" class="mode-label">DNA</label>
+                    
+                    <input type="radio" id="flowerMode" name="visualMode" value="flower">
+                    <label for="flowerMode" class="mode-label">꽃</label>
+                    
+                    <input type="radio" id="tunnelMode" name="visualMode" value="tunnel">
+                    <label for="tunnelMode" class="mode-label">터널</label>
+                    
+                    <input type="radio" id="gridMode" name="visualMode" value="grid">
+                    <label for="gridMode" class="mode-label">그리드</label>
+                    
+                    <input type="radio" id="starfieldMode" name="visualMode" value="starfield">
+                    <label for="starfieldMode" class="mode-label">별</label>
+                    
+                    <input type="radio" id="kaleidoMode" name="visualMode" value="kaleido">
+                    <label for="kaleidoMode" class="mode-label">만화경</label>
+                    
+                    <input type="radio" id="lightningMode" name="visualMode" value="lightning">
+                    <label for="lightningMode" class="mode-label">번개</label>
+                    
+                    <input type="radio" id="rippleMode" name="visualMode" value="ripple">
+                    <label for="rippleMode" class="mode-label">파동</label>
+                    
+                    <input type="radio" id="cubeMode" name="visualMode" value="cube">
+                    <label for="cubeMode" class="mode-label">3D정육면체</label>
+                    
+                    <input type="radio" id="wormholeMode" name="visualMode" value="wormhole">
+                    <label for="wormholeMode" class="mode-label">웜홀</label>
+                    
+                    <input type="radio" id="matrixRainMode" name="visualMode" value="matrixrain">
+                    <label for="matrixRainMode" class="mode-label">매트릭스 비</label>
+                    
+                    <input type="radio" id="soundWaveMode" name="visualMode" value="soundwave">
+                    <label for="soundWaveMode" class="mode-label">음파</label>
+                    
+                    <input type="radio" id="planetMode" name="visualMode" value="planet">
+                    <label for="planetMode" class="mode-label">행성계</label>
+                    
+                    <input type="radio" id="neuralMode" name="visualMode" value="neural">
+                    <label for="neuralMode" class="mode-label">신경망</label>
+                    
+                    <input type="radio" id="prismMode" name="visualMode" value="prism">
+                    <label for="prismMode" class="mode-label">프리즘</label>
+                    
+                    <input type="radio" id="voronoiMode" name="visualMode" value="voronoi">
+                    <label for="voronoiMode" class="mode-label">보로노이</label>
+                    
+                    <input type="radio" id="crystalMode" name="visualMode" value="crystal">
+                    <label for="crystalMode" class="mode-label">크리스탈</label>
+                    
+                    <input type="radio" id="fluidMode" name="visualMode" value="fluid">
+                    <label for="fluidMode" class="mode-label">유체</label>
+                    
+                    <input type="radio" id="galaxyMode" name="visualMode" value="galaxyspiral">
+                    <label for="galaxyMode" class="mode-label">은하나선</label>
+                    
+                    <input type="radio" id="membraneMode" name="visualMode" value="membrane">
+                    <label for="membraneMode" class="mode-label">막</label>
+                    
+                    <input type="radio" id="quantumMode" name="visualMode" value="quantum">
+                    <label for="quantumMode" class="mode-label">양자장</label>
+                    
+                    <input type="radio" id="fractalsMode" name="visualMode" value="fractals">
+                    <label for="fractalsMode" class="mode-label">프랙탈</label>
+                    
+                    <input type="radio" id="waveinterferenceMode" name="visualMode" value="waveinterference">
+                    <label for="waveinterferenceMode" class="mode-label">파간섭</label>
+                </div>
+            </div>
+            
+            <div class="settings-section">
+                <h3>색상 테마</h3>
+                <div class="color-palette">
+                    <div class="color-option active" data-theme="neon">네온</div>
+                    <div class="color-option" data-theme="sunset">서니</div>
+                    <div class="color-option" data-theme="ocean">바다</div>
+                    <div class="color-option" data-theme="forest">숲</div>
+                    <div class="color-option" data-theme="aurora">오로라</div>
+                    <div class="color-option" data-theme="fire">불</div>
+                    <div class="color-option" data-theme="cyber">사이버</div>
+                    <div class="color-option" data-theme="galaxy">은하</div>
+                    <div class="color-option" data-theme="rainbow">무지개</div>
+                    <div class="color-option" data-theme="matrix">매트릭스</div>
+                    <div class="color-option" data-theme="gold">금</div>
+                    <div class="color-option" data-theme="ice">얼음</div>
+                    <div class="color-option" data-theme="lava">용암</div>
+                    <div class="color-option" data-theme="space">우주</div>
+                    <div class="color-option" data-theme="tropical">열대</div>
+                    <div class="color-option" data-theme="midnight">자정</div>
+                    <div class="color-option" data-theme="emerald">에메랄드</div>
+                    <div class="color-option" data-theme="ruby">루비</div>
+                    <div class="color-option" data-theme="sapphire">사파이어</div>
+                    <div class="color-option" data-theme="monochrome">흑백</div>
+                    <div class="color-option" data-theme="vintage">빈티지</div>
+                    <div class="color-option" data-theme="pastel">파스텔</div>
+                    <div class="color-option" data-theme="neon2">네온2</div>
+                    <div class="color-option" data-theme="toxic">독</div>
+                    <div class="color-option" data-theme="crystal">크리스탈</div>
+                </div>
+            </div>
+            
+            <div class="settings-section">
+                <h3>스타일 설정</h3>
+                <div class="style-controls-inline">
+                    <div class="control-inline">
+                        <label for="lineWidth">선굵기</label>
+                        <input type="range" id="lineWidth" min="1" max="10" value="2" class="slider-inline">
+                        <span id="lineWidthValue">2</span>
+                    </div>
+                    
+                    <div class="control-inline">
+                        <label for="sensitivity">민감도</label>
+                        <input type="range" id="sensitivity" min="0.5" max="3" step="0.1" value="1" class="slider-inline">
+                        <span id="sensitivityValue">1.0</span>
+                    </div>
+                    
+                    <div class="control-inline">
+                        <label for="smoothing">부드러움</label>
+                        <input type="range" id="smoothing" min="0" max="0.9" step="0.1" value="0.8" class="slider-inline">
+                        <span id="smoothingValue">0.8</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="visualizer-container">
+            <canvas id="visualizer" width="800" height="400"></canvas>
+        </div>
+        
+        <div class="audio-controls">
+            <audio id="audioPlayer" controls style="width: 100%;"></audio>
+        </div>
+        
+        <div class="info-panel">
+            <div class="status">상태: <span id="status">대기중</span></div>
+            <div class="recording-status">녹화: <span id="recordingStatus">준비</span></div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
