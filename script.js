@@ -17,6 +17,8 @@ class MusicVisualizer {
         this.lineWidth = 2;
         this.sensitivity = 1.0;
         this.smoothing = 0.8;
+        this.backgroundType = 'transparent';
+        this.customBackgroundColor = '#000000';
         
         this.colorThemes = {
             neon: ['#ff006e', '#8338ec', '#3a86ff'],
@@ -43,7 +45,15 @@ class MusicVisualizer {
             pastel: ['#ffecd2', '#fcb69f', '#a8edea'],
             neon2: ['#ff0080', '#00ff80', '#8000ff'],
             toxic: ['#8360c3', '#2ebf91', '#f093fb'],
-            crystal: ['#667eea', '#764ba2', '#f093fb']
+            crystal: ['#667eea', '#764ba2', '#f093fb'],
+            cherry: ['#eb3349', '#f45c43', '#ff6b35'],
+            electric: ['#00d2ff', '#3a7bd5', '#00d4aa'],
+            cosmic: ['#667db6', '#0082c8', '#0078ff'],
+            volcano: ['#ff416c', '#ff4b2b', '#ff5722'],
+            dream: ['#a8caba', '#5d4e75', '#667db6'],
+            neon3: ['#ff0099', '#493240', '#f093fb'],
+            gradient: ['#667eea', '#764ba2', '#a8edea', '#fed6e3'],
+            royal: ['#667db6', '#0082c8', '#667eea']
         };
         
         this.initializeElements();
@@ -148,6 +158,29 @@ class MusicVisualizer {
             if (this.analyser) {
                 this.analyser.smoothingTimeConstant = this.smoothing;
             }
+        });
+        
+        // 배경 설정 이벤트 리스너
+        const backgroundOptions = document.querySelectorAll('.background-option');
+        const customBackgroundControls = document.querySelector('.custom-background-controls');
+        const customBackgroundColor = document.getElementById('customBackgroundColor');
+        
+        backgroundOptions.forEach(option => {
+            option.addEventListener('click', (e) => {
+                backgroundOptions.forEach(opt => opt.classList.remove('active'));
+                e.target.classList.add('active');
+                this.backgroundType = e.target.dataset.background;
+                
+                if (this.backgroundType === 'custom') {
+                    customBackgroundControls.style.display = 'flex';
+                } else {
+                    customBackgroundControls.style.display = 'none';
+                }
+            });
+        });
+        
+        customBackgroundColor.addEventListener('input', (e) => {
+            this.customBackgroundColor = e.target.value;
         });
         
         this.initParticles();
@@ -327,8 +360,8 @@ class MusicVisualizer {
             this.ctx.clearRect(0, 0, width, height);
             this.ctx.restore();
         } else {
-            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-            this.ctx.fillRect(0, 0, width, height);
+            // 배경 설정에 따른 배경 그리기
+            this.drawBackground();
         }
         
         this.analyser.getByteFrequencyData(this.dataArray);
@@ -423,6 +456,24 @@ class MusicVisualizer {
                 break;
             case 'waveinterference':
                 this.drawWaveInterference();
+                break;
+            case 'fireworks':
+                this.drawFireworks();
+                break;
+            case 'aurora2':
+                this.drawAurora2();
+                break;
+            case 'atom':
+                this.drawAtom();
+                break;
+            case 'flock':
+                this.drawFlock();
+                break;
+            case 'tesla':
+                this.drawTesla();
+                break;
+            case 'hexagon':
+                this.drawHexagon();
                 break;
         }
     }
@@ -2318,6 +2369,459 @@ class MusicVisualizer {
         if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
             this.mediaRecorder.stop();
         }
+    }
+    
+    drawBackground() {
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        
+        switch(this.backgroundType) {
+            case 'transparent':
+                this.ctx.clearRect(0, 0, width, height);
+                break;
+            case 'black':
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+                this.ctx.fillRect(0, 0, width, height);
+                break;
+            case 'white':
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+                this.ctx.fillRect(0, 0, width, height);
+                break;
+            case 'green':
+                this.ctx.fillStyle = 'rgba(0, 255, 0, 0.15)';
+                this.ctx.fillRect(0, 0, width, height);
+                break;
+            case 'custom':
+                const rgb = this.hexToRgb(this.customBackgroundColor);
+                this.ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`;
+                this.ctx.fillRect(0, 0, width, height);
+                break;
+            default:
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+                this.ctx.fillRect(0, 0, width, height);
+        }
+    }
+    
+    drawFireworks() {
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        const colors = this.colorThemes[this.colorTheme] || this.colorThemes.neon;
+        
+        this.ctx.save();
+        this.ctx.translate(width / 2, height / 2);
+        
+        for (let i = 0; i < this.bufferLength; i += 8) {
+            const intensity = (this.dataArray[i] / 255) * this.sensitivity;
+            if (intensity < 0.3) continue;
+            
+            const colorIndex = Math.floor(intensity * (colors.length - 1));
+            const color = this.hexToRgb(colors[colorIndex]);
+            
+            // 폭죽 폭발 효과
+            const explosionX = (Math.random() - 0.5) * width * 0.8;
+            const explosionY = (Math.random() - 0.5) * height * 0.8;
+            
+            const particles = Math.floor(intensity * 20) + 10;
+            
+            for (let p = 0; p < particles; p++) {
+                const angle = (Math.PI * 2 * p) / particles;
+                const radius = intensity * 100 * (0.5 + Math.random() * 0.5);
+                
+                const x = explosionX + Math.cos(angle) * radius;
+                const y = explosionY + Math.sin(angle) * radius;
+                
+                this.ctx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${intensity * 0.8})`;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, intensity * 3 + 1, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // 꼬리 효과
+                const tailLength = intensity * 30;
+                this.ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${intensity * 0.4})`;
+                this.ctx.lineWidth = intensity * 2;
+                this.ctx.beginPath();
+                this.ctx.moveTo(explosionX, explosionY);
+                this.ctx.lineTo(x, y);
+                this.ctx.stroke();
+            }
+        }
+        
+        this.ctx.restore();
+    }
+    
+    drawAurora2() {
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        const colors = this.colorThemes[this.colorTheme] || this.colorThemes.neon;
+        
+        this.ctx.save();
+        
+        // 오로라 파도 효과
+        for (let layer = 0; layer < 5; layer++) {
+            const layerOffset = layer * 50;
+            const amplitude = 150 - layer * 20;
+            
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, height / 2 + layerOffset);
+            
+            for (let x = 0; x < width; x += 10) {
+                const dataIndex = Math.floor((x / width) * this.bufferLength);
+                const intensity = (this.dataArray[dataIndex] / 255) * this.sensitivity;
+                
+                const waveY = height / 2 + layerOffset + 
+                    Math.sin(x * 0.02 + Date.now() * 0.003) * amplitude * intensity +
+                    Math.sin(x * 0.005 + Date.now() * 0.001) * amplitude * 0.3;
+                
+                this.ctx.lineTo(x, waveY);
+            }
+            
+            this.ctx.lineTo(width, height);
+            this.ctx.lineTo(0, height);
+            this.ctx.closePath();
+            
+            const colorIndex = layer % colors.length;
+            const color = this.hexToRgb(colors[colorIndex]);
+            const gradient = this.ctx.createLinearGradient(0, height / 2, 0, height);
+            gradient.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, 0.3)`);
+            gradient.addColorStop(1, `rgba(${color.r}, ${color.g}, ${color.b}, 0.05)`);
+            
+            this.ctx.fillStyle = gradient;
+            this.ctx.fill();
+        }
+        
+        this.ctx.restore();
+    }
+    
+    drawAtom() {
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        const colors = this.colorThemes[this.colorTheme] || this.colorThemes.neon;
+        
+        this.ctx.save();
+        this.ctx.translate(width / 2, height / 2);
+        
+        // 원자핵
+        const coreIntensity = (this.dataArray[0] / 255) * this.sensitivity;
+        const coreColor = this.hexToRgb(colors[0]);
+        this.ctx.fillStyle = `rgba(${coreColor.r}, ${coreColor.g}, ${coreColor.b}, ${coreIntensity * 0.8 + 0.2})`;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, coreIntensity * 30 + 10, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // 전자 궤도
+        const orbits = 6;
+        for (let orbit = 0; orbit < orbits; orbit++) {
+            const orbitRadius = 80 + orbit * 60;
+            const orbitSpeed = 0.01 + orbit * 0.005;
+            
+            // 궤도 경로
+            this.ctx.strokeStyle = `rgba(255, 255, 255, 0.1)`;
+            this.ctx.lineWidth = 1;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, orbitRadius, 0, Math.PI * 2);
+            this.ctx.stroke();
+            
+            // 전자들
+            const electrons = 2 + orbit;
+            for (let e = 0; e < electrons; e++) {
+                const dataIndex = Math.floor((orbit * electrons + e) % this.bufferLength);
+                const intensity = (this.dataArray[dataIndex] / 255) * this.sensitivity;
+                
+                const angle = (Date.now() * orbitSpeed) + (e * Math.PI * 2) / electrons;
+                const x = Math.cos(angle) * orbitRadius;
+                const y = Math.sin(angle) * orbitRadius * 0.3; // 타원형 궤도
+                
+                const colorIndex = (orbit + e) % colors.length;
+                const color = this.hexToRgb(colors[colorIndex]);
+                
+                this.ctx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${intensity * 0.8 + 0.2})`;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, intensity * 8 + 3, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // 전자 궤적
+                if (intensity > 0.5) {
+                    this.ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${intensity * 0.3})`;
+                    this.ctx.lineWidth = intensity * 2;
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 0, orbitRadius, angle - 0.5, angle);
+                    this.ctx.stroke();
+                }
+            }
+        }
+        
+        this.ctx.restore();
+    }
+    
+    drawFlock() {
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        const colors = this.colorThemes[this.colorTheme] || this.colorThemes.neon;
+        
+        if (!this.flockParticles) {
+            this.flockParticles = [];
+            for (let i = 0; i < 80; i++) {
+                this.flockParticles.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: (Math.random() - 0.5) * 2,
+                    size: Math.random() * 4 + 2,
+                    colorIndex: Math.floor(Math.random() * colors.length)
+                });
+            }
+        }
+        
+        // 무리 행동 업데이트
+        this.flockParticles.forEach((particle, i) => {
+            const dataIndex = i % this.bufferLength;
+            const intensity = (this.dataArray[dataIndex] / 255) * this.sensitivity;
+            
+            // 이웃 찾기
+            let avgX = 0, avgY = 0, avgVx = 0, avgVy = 0;
+            let neighbors = 0;
+            let separateX = 0, separateY = 0;
+            
+            this.flockParticles.forEach((other, j) => {
+                if (i === j) return;
+                
+                const dx = other.x - particle.x;
+                const dy = other.y - particle.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 100) {
+                    avgX += other.x;
+                    avgY += other.y;
+                    avgVx += other.vx;
+                    avgVy += other.vy;
+                    neighbors++;
+                    
+                    if (distance < 30) {
+                        separateX -= dx / distance;
+                        separateY -= dy / distance;
+                    }
+                }
+            });
+            
+            if (neighbors > 0) {
+                avgX /= neighbors;
+                avgY /= neighbors;
+                avgVx /= neighbors;
+                avgVy /= neighbors;
+                
+                // 무리 중심으로 이동
+                particle.vx += (avgX - particle.x) * 0.0005;
+                particle.vy += (avgY - particle.y) * 0.0005;
+                
+                // 속도 정렬
+                particle.vx += (avgVx - particle.vx) * 0.02;
+                particle.vy += (avgVy - particle.vy) * 0.02;
+                
+                // 분리
+                particle.vx += separateX * 0.05;
+                particle.vy += separateY * 0.05;
+            }
+            
+            // 음악에 반응
+            particle.vx += (Math.random() - 0.5) * intensity * 0.5;
+            particle.vy += (Math.random() - 0.5) * intensity * 0.5;
+            
+            // 속도 제한
+            const speed = Math.sqrt(particle.vx * particle.vx + particle.vy * particle.vy);
+            const maxSpeed = 3 + intensity * 2;
+            if (speed > maxSpeed) {
+                particle.vx = (particle.vx / speed) * maxSpeed;
+                particle.vy = (particle.vy / speed) * maxSpeed;
+            }
+            
+            // 위치 업데이트
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+            
+            // 경계 처리
+            if (particle.x < 0) { particle.x = width; particle.vx *= -0.5; }
+            if (particle.x > width) { particle.x = 0; particle.vx *= -0.5; }
+            if (particle.y < 0) { particle.y = height; particle.vy *= -0.5; }
+            if (particle.y > height) { particle.y = 0; particle.vy *= -0.5; }
+            
+            // 그리기
+            const color = this.hexToRgb(colors[particle.colorIndex]);
+            this.ctx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${intensity * 0.6 + 0.4})`;
+            this.ctx.beginPath();
+            this.ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // 방향 표시
+            const angle = Math.atan2(particle.vy, particle.vx);
+            this.ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${intensity * 0.8})`;
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            this.ctx.moveTo(particle.x, particle.y);
+            this.ctx.lineTo(
+                particle.x + Math.cos(angle) * (particle.size + 10),
+                particle.y + Math.sin(angle) * (particle.size + 10)
+            );
+            this.ctx.stroke();
+        });
+    }
+    
+    drawTesla() {
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        const colors = this.colorThemes[this.colorTheme] || this.colorThemes.neon;
+        
+        this.ctx.save();
+        this.ctx.translate(width / 2, height / 2);
+        
+        // 테슬라 코일 효과
+        const coils = 4;
+        for (let coil = 0; coil < coils; coil++) {
+            const coilAngle = (coil * Math.PI * 2) / coils;
+            const coilX = Math.cos(coilAngle) * 200;
+            const coilY = Math.sin(coilAngle) * 200;
+            
+            // 코일 베이스
+            const baseIntensity = (this.dataArray[coil * 32] / 255) * this.sensitivity;
+            const baseColor = this.hexToRgb(colors[coil % colors.length]);
+            
+            this.ctx.fillStyle = `rgba(${baseColor.r}, ${baseColor.g}, ${baseColor.b}, 0.6)`;
+            this.ctx.beginPath();
+            this.ctx.arc(coilX, coilY, 15, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // 전기 방전 효과
+            if (baseIntensity > 0.4) {
+                const bolts = Math.floor(baseIntensity * 8) + 3;
+                
+                for (let bolt = 0; bolt < bolts; bolt++) {
+                    const targetAngle = Math.random() * Math.PI * 2;
+                    const distance = baseIntensity * 300 + 50;
+                    
+                    this.ctx.strokeStyle = `rgba(${baseColor.r + 100}, ${baseColor.g + 100}, ${baseColor.b + 100}, ${baseIntensity})`;
+                    this.ctx.lineWidth = Math.random() * 3 + 1;
+                    this.ctx.beginPath();
+                    
+                    let currentX = coilX;
+                    let currentY = coilY;
+                    
+                    // 지그재그 번개 효과
+                    const segments = 10;
+                    for (let seg = 0; seg < segments; seg++) {
+                        const progress = seg / segments;
+                        const targetX = coilX + Math.cos(targetAngle) * distance * progress;
+                        const targetY = coilY + Math.sin(targetAngle) * distance * progress;
+                        
+                        // 랜덤한 지그재그
+                        const zigX = targetX + (Math.random() - 0.5) * 40;
+                        const zigY = targetY + (Math.random() - 0.5) * 40;
+                        
+                        this.ctx.lineTo(zigX, zigY);
+                        currentX = zigX;
+                        currentY = zigY;
+                    }
+                    
+                    this.ctx.stroke();
+                    
+                    // 방전 끝점 효과
+                    this.ctx.fillStyle = `rgba(255, 255, 255, ${baseIntensity * 0.8})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(currentX, currentY, baseIntensity * 5, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                
+                // 코일 간 방전
+                for (let otherCoil = coil + 1; otherCoil < coils; otherCoil++) {
+                    const otherAngle = (otherCoil * Math.PI * 2) / coils;
+                    const otherX = Math.cos(otherAngle) * 200;
+                    const otherY = Math.sin(otherAngle) * 200;
+                    
+                    const otherIntensity = (this.dataArray[otherCoil * 32] / 255) * this.sensitivity;
+                    
+                    if (baseIntensity > 0.6 && otherIntensity > 0.6 && Math.random() < 0.3) {
+                        this.ctx.strokeStyle = `rgba(${baseColor.r}, ${baseColor.g}, ${baseColor.b}, ${(baseIntensity + otherIntensity) * 0.4})`;
+                        this.ctx.lineWidth = (baseIntensity + otherIntensity) * 2;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(coilX, coilY);
+                        
+                        // 곡선 방전
+                        const midX = (coilX + otherX) / 2 + (Math.random() - 0.5) * 100;
+                        const midY = (coilY + otherY) / 2 + (Math.random() - 0.5) * 100;
+                        
+                        this.ctx.quadraticCurveTo(midX, midY, otherX, otherY);
+                        this.ctx.stroke();
+                    }
+                }
+            }
+        }
+        
+        this.ctx.restore();
+    }
+    
+    drawHexagon() {
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        const colors = this.colorThemes[this.colorTheme] || this.colorThemes.neon;
+        
+        this.ctx.save();
+        this.ctx.translate(width / 2, height / 2);
+        
+        // 육각형 패턴
+        const hexSize = 40;
+        const rows = Math.ceil(height / (hexSize * 1.5)) + 2;
+        const cols = Math.ceil(width / (hexSize * 1.8)) + 2;
+        
+        for (let row = -rows/2; row < rows/2; row++) {
+            for (let col = -cols/2; col < cols/2; col++) {
+                const x = col * hexSize * 1.8 + (row % 2) * hexSize * 0.9;
+                const y = row * hexSize * 1.5;
+                
+                const distance = Math.sqrt(x * x + y * y);
+                const dataIndex = Math.floor((distance / 300) * this.bufferLength) % this.bufferLength;
+                const intensity = (this.dataArray[dataIndex] / 255) * this.sensitivity;
+                
+                if (intensity < 0.2) continue;
+                
+                const colorIndex = Math.floor((distance + Date.now() * 0.001) * 0.01) % colors.length;
+                const color = this.hexToRgb(colors[colorIndex]);
+                
+                this.ctx.save();
+                this.ctx.translate(x, y);
+                this.ctx.rotate(Date.now() * 0.001 + distance * 0.01);
+                
+                // 육각형 그리기
+                this.ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i * Math.PI * 2) / 6;
+                    const hexX = Math.cos(angle) * hexSize * intensity;
+                    const hexY = Math.sin(angle) * hexSize * intensity;
+                    
+                    if (i === 0) this.ctx.moveTo(hexX, hexY);
+                    else this.ctx.lineTo(hexX, hexY);
+                }
+                this.ctx.closePath();
+                
+                // 채우기
+                this.ctx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${intensity * 0.3})`;
+                this.ctx.fill();
+                
+                // 경계선
+                this.ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${intensity * 0.8})`;
+                this.ctx.lineWidth = intensity * 2;
+                this.ctx.stroke();
+                
+                // 중심점
+                if (intensity > 0.7) {
+                    this.ctx.fillStyle = `rgba(255, 255, 255, ${intensity})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 0, intensity * 8, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                
+                this.ctx.restore();
+            }
+        }
+        
+        this.ctx.restore();
     }
 }
 

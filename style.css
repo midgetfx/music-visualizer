@@ -521,3 +521,68 @@ h1 {
 .color-option[data-theme="neon2"] { background: linear-gradient(45deg, #ff0080, #00ff80, #8000ff); }
 .color-option[data-theme="toxic"] { background: linear-gradient(45deg, #8360c3, #2ebf91, #f093fb); }
 .color-option[data-theme="crystal"] { background: linear-gradient(45deg, #667eea, #764ba2, #f093fb); }
+.color-option[data-theme="cherry"] { background: linear-gradient(45deg, #eb3349, #f45c43, #ff6b35); }
+.color-option[data-theme="electric"] { background: linear-gradient(45deg, #00d2ff, #3a7bd5, #00d4aa); }
+.color-option[data-theme="cosmic"] { background: linear-gradient(45deg, #667db6, #0082c8, #0078ff); }
+.color-option[data-theme="volcano"] { background: linear-gradient(45deg, #ff416c, #ff4b2b, #ff5722); }
+.color-option[data-theme="dream"] { background: linear-gradient(45deg, #a8caba, #5d4e75, #667db6); }
+.color-option[data-theme="neon3"] { background: linear-gradient(45deg, #ff0099, #493240, #f093fb); }
+.color-option[data-theme="gradient"] { background: linear-gradient(45deg, #667eea, #764ba2, #a8edea, #fed6e3); }
+.color-option[data-theme="royal"] { background: linear-gradient(45deg, #667db6, #0082c8, #667eea); }
+
+.background-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.background-presets {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.background-option {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 20px;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+.background-option:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+.background-option.active {
+    background: linear-gradient(45deg, #4ecdc4, #45b7af);
+    border-color: #4ecdc4;
+    color: white;
+}
+
+.custom-background-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 15px;
+    border-radius: 10px;
+}
+
+.custom-background-controls input[type="color"] {
+    width: 50px;
+    height: 30px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.custom-background-controls label {
+    color: #ffffff;
+    font-weight: bold;
+}
