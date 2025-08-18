@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Music Visualizer</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apng-js@1.1.1/dist/apng-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -27,6 +30,14 @@
             <div class="recording-controls">
                 <button id="downloadVideoBtn" class="btn download-btn" disabled>영상 다운로드</button>
                 <button id="downloadTransparentBtn" class="btn transparent-btn" disabled>투명 영상 다운로드</button>
+                <button id="downloadGifAnimBtn" class="btn gif-anim-btn" disabled>움직이는 GIF 다운로드</button>
+                <div class="png-download-container">
+                    <button id="downloadGifBtn" class="btn gif-btn" disabled>PNG 다운로드</button>
+                    <select id="pngFormatSelect" class="png-format-select" disabled>
+                        <option value="sequence">프레임 시퀀스 (ZIP)</option>
+                        <option value="animated">움직이는 PNG (APNG)</option>
+                    </select>
+                </div>
             </div>
         </div>
         
@@ -202,6 +213,26 @@
                         <label for="smoothing">부드러움</label>
                         <input type="range" id="smoothing" min="0" max="0.9" step="0.1" value="0.8" class="slider-inline">
                         <span id="smoothingValue">0.8</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="settings-section">
+                <h3>줌 컨트롤</h3>
+                <div class="zoom-controls">
+                    <div class="zoom-buttons">
+                        <button id="zoomOutBtn" class="btn zoom-btn">-</button>
+                        <button id="zoomInBtn" class="btn zoom-btn">+</button>
+                        <button id="zoomResetBtn" class="btn zoom-btn">리셋</button>
+                    </div>
+                    <div class="zoom-slider-container">
+                        <label for="zoomSlider">줌 레벨</label>
+                        <input type="range" id="zoomSlider" min="10" max="1000" value="100" step="5" class="slider-inline">
+                        <input type="number" id="zoomInput" min="10" max="1000" value="100" step="5" class="zoom-number-input">
+                        <span>%</span>
+                    </div>
+                    <div class="zoom-hint">
+                        마우스휠로 확대/축소, 드래그로 이동
                     </div>
                 </div>
             </div>

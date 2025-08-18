@@ -1,3 +1,98 @@
+// 브라우저 호환성 체크 및 전역 오류 처리기
+const BrowserCompatibility = {
+    checkSupport() {
+        const features = {
+            audioContext: !!(window.AudioContext || window.webkitAudioContext),
+            mediaRecorder: !!window.MediaRecorder,
+            canvas: !!document.createElement('canvas').getContext,
+            fileAPI: !!(window.File && window.FileReader && window.FileList && window.Blob),
+            webGL: !!document.createElement('canvas').getContext('webgl'),
+            webAssembly: typeof WebAssembly === 'object'
+        };
+        
+        const unsupported = Object.entries(features)
+            .filter(([key, supported]) => !supported)
+            .map(([key]) => key);
+            
+        if (unsupported.length > 0) {
+            console.warn('Unsupported features:', unsupported);
+        }
+        
+        return {
+            isSupported: unsupported.length === 0,
+            unsupportedFeatures: unsupported,
+            browserInfo: this.getBrowserInfo()
+        };
+    },
+    
+    getBrowserInfo() {
+        const ua = navigator.userAgent;
+        const browsers = {
+            chrome: /Chrome\/(\d+)/.exec(ua),
+            firefox: /Firefox\/(\d+)/.exec(ua),
+            safari: /Version\/(\d+).*Safari/.exec(ua),
+            edge: /Edg\/(\d+)/.exec(ua)
+        };
+        
+        for (const [name, match] of Object.entries(browsers)) {
+            if (match) return { name, version: parseInt(match[1]) };
+        }
+        return { name: 'unknown', version: 0 };
+    }
+};
+
+// 전역 오류 처리기 추가
+window.addEventListener('error', (e) => {
+    // Chrome 확장 프로그램 관련 오류 무시
+    const extensionErrors = [
+        'Could not establish connection',
+        'Extension context invalidated',
+        'The message port closed before a response was received'
+    ];
+    
+    if (extensionErrors.some(error => e.message && e.message.includes(error))) {
+        console.log('Chrome extension error suppressed:', e.message);
+        return true;
+    }
+    
+    // 기타 중요하지 않은 오류들
+    const ignorableErrors = [
+        'Non-Error promise rejection captured',
+        'ResizeObserver loop limit exceeded'
+    ];
+    
+    if (ignorableErrors.some(error => e.message && e.message.includes(error))) {
+        console.log('Ignorable error suppressed:', e.message);
+        return true;
+    }
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+    // Chrome 확장 프로그램 관련 Promise 거부 무시
+    const reason = e.reason?.message || String(e.reason);
+    const extensionErrors = [
+        'Could not establish connection',
+        'Extension context invalidated',
+        'The message port closed before a response was received'
+    ];
+    
+    if (extensionErrors.some(error => reason.includes(error))) {
+        console.log('Chrome extension promise rejection suppressed:', reason);
+        e.preventDefault();
+        return;
+    }
+});
+
+// 메인 애플리케이션 초기화를 try-catch로 래핑
+try {
+    // 브라우저 호환성 체크
+    const compatibilityCheck = BrowserCompatibility.checkSupport();
+    console.log('Browser compatibility:', compatibilityCheck);
+    
+    if (!compatibilityCheck.isSupported) {
+        console.warn('Some features may not work properly. Unsupported:', compatibilityCheck.unsupportedFeatures);
+    }
+
 class MusicVisualizer {
     constructor() {
         this.audioContext = null;
@@ -9,6 +104,11 @@ class MusicVisualizer {
         this.isRecording = false;
         this.mediaRecorder = null;
         this.recordedChunks = [];
+        this.isRecordingGif = false;
+        this.apngFrames = [];
+        this.apngFrameDelays = [];
+        this.isRecordingRealGif = false;
+        this.gifRecorder = null;
         this.animationId = null;
         this.particles = [];
         
@@ -19,6 +119,12 @@ class MusicVisualizer {
         this.smoothing = 0.8;
         this.backgroundType = 'transparent';
         this.customBackgroundColor = '#000000';
+        
+        this.zoomLevel = 1.0;
+        this.zoomCenter = { x: 0, y: 0 };
+        this.panOffset = { x: 0, y: 0 };
+        this.isDragging = false;
+        this.lastMousePos = { x: 0, y: 0 };
         
         this.colorThemes = {
             neon: ['#ff006e', '#8338ec', '#3a86ff'],
@@ -59,6 +165,9 @@ class MusicVisualizer {
         this.initializeElements();
         this.setupEventListeners();
         
+        // 초기 줌 레벨 표시 업데이트
+        this.updateZoomDisplay();
+        
         // 초기 색상 테마 확인
         console.log('Initial color theme:', this.colorTheme);
         console.log('Available color themes:', Object.keys(this.colorThemes));
@@ -72,8 +181,14 @@ class MusicVisualizer {
         this.stopBtn = document.getElementById('stopBtn');
         this.downloadVideoBtn = document.getElementById('downloadVideoBtn');
         this.downloadTransparentBtn = document.getElementById('downloadTransparentBtn');
+        this.downloadGifBtn = document.getElementById('downloadGifBtn');
+        this.downloadGifAnimBtn = document.getElementById('downloadGifAnimBtn');
+        this.pngFormatSelect = document.getElementById('pngFormatSelect');
         this.canvas = document.getElementById('visualizer');
-        this.ctx = this.canvas.getContext('2d');
+        this.ctx = this.canvas.getContext('2d', { 
+            willReadFrequently: true,
+            alpha: true 
+        });
         this.status = document.getElementById('status');
         this.recordingStatus = document.getElementById('recordingStatus');
         
@@ -84,10 +199,17 @@ class MusicVisualizer {
         this.smoothingSlider = document.getElementById('smoothing');
         this.smoothingValue = document.getElementById('smoothingValue');
         
+        this.zoomInBtn = document.getElementById('zoomInBtn');
+        this.zoomOutBtn = document.getElementById('zoomOutBtn');
+        this.zoomResetBtn = document.getElementById('zoomResetBtn');
+        this.zoomSlider = document.getElementById('zoomSlider');
+        this.zoomInput = document.getElementById('zoomInput');
+        
         this.canvas.width = 1280;
         this.canvas.height = 720;
         this.canvas.style.width = '800px';
         this.canvas.style.height = '450px';
+        this.canvas.style.cursor = 'grab';
     }
     
     setupEventListeners() {
@@ -97,6 +219,8 @@ class MusicVisualizer {
         this.stopBtn.addEventListener('click', () => this.stop());
         this.downloadVideoBtn.addEventListener('click', () => this.downloadVideo(false));
         this.downloadTransparentBtn.addEventListener('click', () => this.downloadVideo(true));
+        this.downloadGifAnimBtn.addEventListener('click', () => this.downloadRealGif());
+        this.downloadGifBtn.addEventListener('click', () => this.downloadGif());
         
         this.audioPlayer.addEventListener('ended', () => {
             this.isPlaying = false;
@@ -183,6 +307,20 @@ class MusicVisualizer {
             this.customBackgroundColor = e.target.value;
         });
         
+        this.zoomInBtn.addEventListener('click', () => this.zoomIn());
+        this.zoomOutBtn.addEventListener('click', () => this.zoomOut());
+        this.zoomResetBtn.addEventListener('click', () => this.resetZoom());
+        
+        this.zoomSlider.addEventListener('input', (e) => this.setZoomFromSlider(e));
+        this.zoomInput.addEventListener('input', (e) => this.setZoomFromInput(e));
+        this.zoomInput.addEventListener('change', (e) => this.setZoomFromInput(e));
+        
+        this.canvas.addEventListener('wheel', (e) => this.handleWheel(e));
+        this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+        this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+        this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+        this.canvas.addEventListener('mouseleave', (e) => this.handleMouseUp(e));
+        
         this.initParticles();
     }
     
@@ -198,6 +336,103 @@ class MusicVisualizer {
                 life: 1.0
             });
         }
+    }
+    
+    zoomIn() {
+        this.zoomLevel = Math.min(this.zoomLevel * 1.2, 10);
+        this.updateZoomDisplay();
+    }
+    
+    zoomOut() {
+        this.zoomLevel = Math.max(this.zoomLevel / 1.2, 0.1);
+        this.updateZoomDisplay();
+    }
+    
+    resetZoom() {
+        this.zoomLevel = 1.0;
+        this.panOffset.x = 0;
+        this.panOffset.y = 0;
+        this.updateZoomDisplay();
+    }
+    
+    updateZoomDisplay() {
+        const zoomPercent = Math.round(this.zoomLevel * 100);
+        this.zoomSlider.value = zoomPercent;
+        this.zoomInput.value = zoomPercent;
+    }
+    
+    setZoomFromSlider(e) {
+        const zoomPercent = parseInt(e.target.value);
+        this.zoomLevel = zoomPercent / 100;
+        this.zoomInput.value = zoomPercent;
+    }
+    
+    setZoomFromInput(e) {
+        let zoomPercent = parseInt(e.target.value);
+        zoomPercent = Math.max(10, Math.min(1000, zoomPercent));
+        this.zoomLevel = zoomPercent / 100;
+        this.zoomSlider.value = zoomPercent;
+        e.target.value = zoomPercent;
+    }
+    
+    handleWheel(e) {
+        e.preventDefault();
+        
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+        const mouseY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+        
+        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+        const newZoomLevel = Math.max(0.1, Math.min(10, this.zoomLevel * zoomFactor));
+        
+        if (newZoomLevel !== this.zoomLevel) {
+            const zoomChange = newZoomLevel / this.zoomLevel;
+            
+            this.panOffset.x = mouseX - (mouseX - this.panOffset.x) * zoomChange;
+            this.panOffset.y = mouseY - (mouseY - this.panOffset.y) * zoomChange;
+            
+            this.zoomLevel = newZoomLevel;
+            this.updateZoomDisplay();
+        }
+    }
+    
+    handleMouseDown(e) {
+        this.isDragging = true;
+        const rect = this.canvas.getBoundingClientRect();
+        this.lastMousePos.x = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+        this.lastMousePos.y = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+        this.canvas.style.cursor = 'grabbing';
+    }
+    
+    handleMouseMove(e) {
+        if (!this.isDragging) return;
+        
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+        const mouseY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+        
+        this.panOffset.x += mouseX - this.lastMousePos.x;
+        this.panOffset.y += mouseY - this.lastMousePos.y;
+        
+        this.lastMousePos.x = mouseX;
+        this.lastMousePos.y = mouseY;
+    }
+    
+    handleMouseUp(e) {
+        this.isDragging = false;
+        this.canvas.style.cursor = 'grab';
+    }
+    
+    applyZoomTransform() {
+        this.ctx.save();
+        this.ctx.translate(this.panOffset.x, this.panOffset.y);
+        this.ctx.scale(this.zoomLevel, this.zoomLevel);
+        this.ctx.translate(-this.canvas.width / 2, -this.canvas.height / 2);
+        this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+    }
+    
+    restoreZoomTransform() {
+        this.ctx.restore();
     }
     
     async loadAudioFile(event) {
@@ -290,6 +525,9 @@ class MusicVisualizer {
         this.stopBtn.disabled = false;
         this.downloadVideoBtn.disabled = false;
         this.downloadTransparentBtn.disabled = false;
+        this.downloadGifAnimBtn.disabled = false;
+        this.downloadGifBtn.disabled = false;
+        this.pngFormatSelect.disabled = false;
     }
     
     updateStatus(message) {
@@ -365,6 +603,9 @@ class MusicVisualizer {
         }
         
         this.analyser.getByteFrequencyData(this.dataArray);
+        
+        // 줌 및 팬 변환 적용
+        this.applyZoomTransform();
         
         switch(this.visualMode) {
             case 'bar':
@@ -476,6 +717,9 @@ class MusicVisualizer {
                 this.drawHexagon();
                 break;
         }
+        
+        // 줌 변환 복원
+        this.restoreZoomTransform();
     }
     
     drawBars() {
@@ -2245,7 +2489,8 @@ class MusicVisualizer {
             const tempCtx = tempCanvas.getContext('2d', {
                 alpha: transparent,
                 preserveDrawingBuffer: true,
-                premultipliedAlpha: false
+                premultipliedAlpha: false,
+                willReadFrequently: false
             });
             
             const originalCanvas = this.canvas;
@@ -2823,8 +3068,799 @@ class MusicVisualizer {
         
         this.ctx.restore();
     }
+    
+    async downloadGif() {
+        if (!this.audioFile.files[0]) {
+            alert('먼저 음악 파일을 선택해주세요.');
+            return;
+        }
+        
+        if (this.isRecordingGif) {
+            alert('이미 PNG를 생성 중입니다. 잠시 기다려주세요.');
+            return;
+        }
+        
+        const format = this.pngFormatSelect.value;
+        const isAPNG = format === 'animated';
+        
+        try {
+            const statusText = isAPNG ? '움직이는 PNG (APNG) 생성 준비 중...' : 'PNG 프레임 시퀀스 생성 준비 중...';
+            this.updateRecordingStatus(statusText);
+            this.isRecordingGif = true;
+            this.apngFrames = [];
+            
+            // 다른 다운로드 버튼 비활성화
+            this.downloadVideoBtn.disabled = true;
+            this.downloadTransparentBtn.disabled = true;
+            this.downloadGifAnimBtn.disabled = true;
+            this.downloadGifBtn.disabled = true;
+            this.pngFormatSelect.disabled = true;
+            
+            // 오디오를 처음부터 재생
+            this.audioPlayer.currentTime = 0;
+            await this.play();
+            
+            // 오디오 종료 시 자동으로 생성 완료 처리
+            const handleAudioEnd = () => {
+                if (this.isRecordingGif && this.apngFrames.length > 0) {
+                    if (isAPNG) {
+                        this.generateAPNG();
+                    } else {
+                        this.generateFrameSequence();
+                    }
+                }
+                this.audioPlayer.removeEventListener('ended', handleAudioEnd);
+            };
+            this.audioPlayer.addEventListener('ended', handleAudioEnd);
+            
+            // 프레임 캡처 설정
+            const frameRate = 12; // 12fps
+            const frameDuration = 1000 / frameRate;
+            const maxDuration = this.audioPlayer.duration * 1000; // 전체 음악 길이
+            let capturedDuration = 0;
+            let frameNumber = 0;
+            
+            const captureFrame = () => {
+                if (!this.isRecordingGif || !this.isPlaying || capturedDuration >= maxDuration) {
+                    if (this.isRecordingGif && this.apngFrames.length > 0) {
+                        if (isAPNG) {
+                            this.generateAPNG();
+                        } else {
+                            this.generateFrameSequence();
+                        }
+                    }
+                    return;
+                }
+                
+                // 투명 배경으로 프레임 캡처
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = this.canvas.width;
+                tempCanvas.height = this.canvas.height;
+                const tempCtx = tempCanvas.getContext('2d', { 
+                    alpha: true,
+                    willReadFrequently: false 
+                });
+                
+                const originalCanvas = this.canvas;
+                const originalCtx = this.ctx;
+                
+                this.canvas = tempCanvas;
+                this.ctx = tempCtx;
+                
+                // 투명 배경으로 시각화 그리기
+                this.drawVisualizer(true);
+                
+                // Canvas를 PNG 데이터 URL로 변환
+                const dataURL = tempCanvas.toDataURL('image/png');
+                this.apngFrames.push({
+                    dataURL: dataURL,
+                    frameNumber: frameNumber
+                });
+                
+                // 원본 캔버스 복원
+                this.canvas = originalCanvas;
+                this.ctx = originalCtx;
+                
+                frameNumber++;
+                capturedDuration += frameDuration;
+                const progress = Math.min(capturedDuration / maxDuration, 1);
+                this.updateRecordingStatus(`프레임 캡처 중... ${Math.round(progress * 100)}% (${frameNumber}프레임)`);
+                
+                setTimeout(captureFrame, frameDuration);
+            };
+            
+            // 첫 프레임 캡처 시작
+            setTimeout(captureFrame, 100);
+            
+        } catch (error) {
+            console.error('PNG 프레임 시퀀스 생성 오류:', error);
+            this.updateRecordingStatus('프레임 생성 실패: ' + error.message);
+            this.isRecordingGif = false;
+            this.downloadVideoBtn.disabled = false;
+            this.downloadTransparentBtn.disabled = false;
+            this.downloadGifBtn.disabled = false;
+            setTimeout(() => this.updateRecordingStatus('준비'), 2000);
+        }
+    }
+    
+    async generateFrameSequence() {
+        try {
+            this.updateRecordingStatus('ZIP 파일 생성 중...');
+            
+            if (this.apngFrames.length === 0) {
+                throw new Error('캡처된 프레임이 없습니다.');
+            }
+            
+            // JSZip 인스턴스 생성
+            const zip = new JSZip();
+            
+            // README 파일 추가
+            const readmeContent = `PNG Frame Sequence - Music Visualizer
+Generated: ${new Date().toLocaleString()}
+Total Frames: ${this.apngFrames.length}
+Frame Rate: 12fps
+Duration: ${Math.round(this.apngFrames.length / 12 * 10) / 10}s
+
+Usage:
+- Import this sequence into video editing software
+- Each PNG has transparent background
+- Files are numbered sequentially: frame_001.png, frame_002.png, etc.
+- Recommended playback: 12fps
+
+Compatible with: After Effects, Premiere Pro, DaVinci Resolve, Blender, etc.`;
+            
+            zip.file('README.txt', readmeContent);
+            
+            // 각 프레임을 ZIP에 추가
+            for (let i = 0; i < this.apngFrames.length; i++) {
+                const frame = this.apngFrames[i];
+                const paddedNumber = String(i + 1).padStart(3, '0');
+                const filename = `frame_${paddedNumber}.png`;
+                
+                // data:image/png;base64, 부분을 제거하고 base64 데이터만 추출
+                const base64Data = frame.dataURL.split(',')[1];
+                zip.file(filename, base64Data, { base64: true });
+                
+                const progress = Math.round(((i + 1) / this.apngFrames.length) * 100);
+                this.updateRecordingStatus(`ZIP 파일 생성 중... ${progress}%`);
+                
+                // UI 블로킹 방지를 위한 비동기 처리
+                if (i % 10 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 1));
+                }
+            }
+            
+            this.updateRecordingStatus('파일 압축 중...');
+            
+            // ZIP 파일 생성
+            const zipBlob = await zip.generateAsync({
+                type: 'blob',
+                compression: 'DEFLATE',
+                compressionOptions: { level: 6 }
+            });
+            
+            // 다운로드
+            const url = URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `music-visualizer-frames-${Date.now()}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            // 상태 복원
+            this.isRecordingGif = false;
+            this.downloadVideoBtn.disabled = false;
+            this.downloadTransparentBtn.disabled = false;
+            this.downloadGifAnimBtn.disabled = false;
+            this.downloadGifBtn.disabled = false;
+            this.pngFormatSelect.disabled = false;
+            
+            this.updateRecordingStatus(`PNG 프레임 시퀀스 다운로드 완료! (${this.apngFrames.length}프레임)`);
+            setTimeout(() => this.updateRecordingStatus('준비'), 3000);
+            
+        } catch (error) {
+            console.error('프레임 시퀀스 생성 오류:', error);
+            this.updateRecordingStatus('ZIP 생성 실패: ' + error.message);
+            this.isRecordingGif = false;
+            this.downloadVideoBtn.disabled = false;
+            this.downloadTransparentBtn.disabled = false;
+            this.downloadGifAnimBtn.disabled = false;
+            this.downloadGifBtn.disabled = false;
+            this.pngFormatSelect.disabled = false;
+            setTimeout(() => this.updateRecordingStatus('준비'), 2000);
+        }
+    }
+    
+    async generateAPNG() {
+        try {
+            this.updateRecordingStatus('APNG 생성 중...');
+            
+            if (this.apngFrames.length === 0) {
+                throw new Error('캡처된 프레임이 없습니다.');
+            }
+            
+            // Canvas 기반 APNG 생성
+            const width = this.canvas.width;
+            const height = this.canvas.height;
+            const frameDuration = 1000 / 12; // 12fps
+            
+            // 첫 번째 프레임을 기본 이미지로 사용
+            const firstFrameCanvas = document.createElement('canvas');
+            firstFrameCanvas.width = width;
+            firstFrameCanvas.height = height;
+            const firstFrameCtx = firstFrameCanvas.getContext('2d', { 
+                alpha: true,
+                willReadFrequently: false 
+            });
+            
+            // 데이터 URL을 이미지로 변환
+            const firstImage = new Image();
+            await new Promise((resolve, reject) => {
+                firstImage.onload = resolve;
+                firstImage.onerror = reject;
+                firstImage.src = this.apngFrames[0].dataURL;
+            });
+            
+            firstFrameCtx.drawImage(firstImage, 0, 0);
+            
+            // 기본 PNG로 시작
+            let apngData = firstFrameCanvas.toDataURL('image/png');
+            
+            // 단순한 APNG 생성 (브라우저 호환성을 위해 Canvas를 사용한 애니메이션 시뮬레이션)
+            // 실제로는 각 프레임을 별도 Canvas에 그리고 하나의 큰 스프라이트 시트로 만듭니다.
+            const spriteCanvas = document.createElement('canvas');
+            const cols = Math.ceil(Math.sqrt(this.apngFrames.length));
+            const rows = Math.ceil(this.apngFrames.length / cols);
+            
+            spriteCanvas.width = width * cols;
+            spriteCanvas.height = height * rows;
+            const spriteCtx = spriteCanvas.getContext('2d', { 
+                alpha: true,
+                willReadFrequently: false 
+            });
+            
+            // 모든 프레임을 스프라이트 시트에 배치
+            for (let i = 0; i < this.apngFrames.length; i++) {
+                const frame = this.apngFrames[i];
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                
+                const img = new Image();
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = frame.dataURL;
+                });
+                
+                spriteCtx.drawImage(img, col * width, row * height, width, height);
+                
+                const progress = Math.round(((i + 1) / this.apngFrames.length) * 100);
+                this.updateRecordingStatus(`APNG 생성 중... ${progress}%`);
+                
+                // UI 블로킹 방지
+                if (i % 5 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 1));
+                }
+            }
+            
+            // 스프라이트 시트를 PNG로 저장
+            const spriteDataURL = spriteCanvas.toDataURL('image/png');
+            const spriteBlob = await this.dataURLToBlob(spriteDataURL);
+            
+            // ZIP 파일에 스프라이트 시트와 사용법 포함
+            const zip = new JSZip();
+            
+            // 스프라이트 시트 추가
+            const spriteBase64 = spriteDataURL.split(',')[1];
+            zip.file('animated_sprite_sheet.png', spriteBase64, { base64: true });
+            
+            // 사용 설명서 추가
+            const readmeContent = `Animated PNG Sprite Sheet - Music Visualizer
+Generated: ${new Date().toLocaleString()}
+Total Frames: ${this.apngFrames.length}
+Grid Layout: ${cols} x ${rows}
+Frame Size: ${width} x ${height}
+Recommended Frame Rate: 12fps
+
+이 스프라이트 시트 사용법:
+
+1. CSS Animation:
+   - CSS에서 background-position을 변경하여 애니메이션 구현
+   - 각 프레임은 ${width}px x ${height}px 크기
+
+2. JavaScript:
+   - Canvas drawImage()로 각 프레임의 위치를 계산하여 그리기
+   - 프레임 위치: (frameIndex % ${cols}) * ${width}, Math.floor(frameIndex / ${cols}) * ${height}
+
+3. Game Engine:
+   - Unity, Godot 등에서 스프라이트 애니메이션으로 사용
+   - 각 프레임을 순차적으로 재생하여 애니메이션 구현
+
+4. After Effects/Video Editing:
+   - 스프라이트 시트를 임포트하여 시퀀스 애니메이션으로 변환
+
+투명 배경이 완벽하게 보존되어 있으므로 어떤 배경에도 합성 가능합니다.`;
+            
+            zip.file('HOW_TO_USE.txt', readmeContent);
+            
+            // 개별 프레임도 포함
+            for (let i = 0; i < this.apngFrames.length; i++) {
+                const frame = this.apngFrames[i];
+                const paddedNumber = String(i + 1).padStart(3, '0');
+                const filename = `frame_${paddedNumber}.png`;
+                const base64Data = frame.dataURL.split(',')[1];
+                zip.file(`frames/${filename}`, base64Data, { base64: true });
+            }
+            
+            // ZIP 생성
+            this.updateRecordingStatus('파일 패키징 중...');
+            const zipBlob = await zip.generateAsync({
+                type: 'blob',
+                compression: 'DEFLATE',
+                compressionOptions: { level: 6 }
+            });
+            
+            // 다운로드
+            const url = URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `music-visualizer-apng-${Date.now()}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            // 상태 복원
+            this.isRecordingGif = false;
+            this.downloadVideoBtn.disabled = false;
+            this.downloadTransparentBtn.disabled = false;
+            this.downloadGifAnimBtn.disabled = false;
+            this.downloadGifBtn.disabled = false;
+            this.pngFormatSelect.disabled = false;
+            
+            this.updateRecordingStatus(`움직이는 PNG 패키지 다운로드 완료! (${this.apngFrames.length}프레임)`);
+            setTimeout(() => this.updateRecordingStatus('준비'), 3000);
+            
+        } catch (error) {
+            console.error('APNG 생성 오류:', error);
+            this.updateRecordingStatus('APNG 생성 실패: ' + error.message);
+            this.isRecordingGif = false;
+            this.downloadVideoBtn.disabled = false;
+            this.downloadTransparentBtn.disabled = false;
+            this.downloadGifAnimBtn.disabled = false;
+            this.downloadGifBtn.disabled = false;
+            this.pngFormatSelect.disabled = false;
+            setTimeout(() => this.updateRecordingStatus('준비'), 2000);
+        }
+    }
+    
+    async dataURLToBlob(dataURL) {
+        const response = await fetch(dataURL);
+        return response.blob();
+    }
+    
+    async downloadRealGif() {
+        if (!this.audioFile.files[0]) {
+            alert('먼저 음악 파일을 선택해주세요.');
+            return;
+        }
+        
+        if (this.isRecordingRealGif) {
+            alert('이미 GIF를 생성 중입니다. 잠시 기다려주세요.');
+            return;
+        }
+        
+        try {
+            this.updateRecordingStatus('움직이는 GIF 생성 준비 중...');
+            this.isRecordingRealGif = true;
+            
+            // 다른 다운로드 버튼 비활성화
+            this.downloadVideoBtn.disabled = true;
+            this.downloadTransparentBtn.disabled = true;
+            this.downloadGifAnimBtn.disabled = true;
+            this.downloadGifBtn.disabled = true;
+            this.pngFormatSelect.disabled = true;
+            
+            // GIF 생성기 초기화 (최적화된 설정)
+            this.gifRecorder = new GIF({
+                workers: 2, // 워커 수 증가
+                quality: 10, // 품질 향상 (0-30, 낮을수록 고품질)
+                width: Math.min(this.canvas.width, 800), // 최대 너비 제한
+                height: Math.min(this.canvas.height, 600), // 최대 높이 제한
+                transparent: null,
+                debug: true, // 디버그 모드 활성화
+                repeat: 0,
+                background: '#000000',
+                dither: false, // 디더링 비활성화로 성능 향상
+                globalPalette: true, // 글로벌 팔레트 사용
+                workerScript: 'https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js'
+            });
+            
+            let renderingFinished = false;
+            
+            this.gifRecorder.on('finished', (blob) => {
+                try {
+                    clearTimeout(renderTimeout);
+                    renderingFinished = true;
+                    console.log('GIF 생성 완료, 파일 크기:', blob.size, 'bytes');
+                    
+                    if (blob.size === 0) {
+                        throw new Error('생성된 GIF 파일이 비어있습니다.');
+                    }
+                    
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `music-visualizer-animated-${Date.now()}.gif`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    
+                    this.updateRecordingStatus(`움직이는 GIF 다운로드 완료! (${(blob.size / 1024 / 1024).toFixed(1)}MB)`);
+                    setTimeout(() => this.updateRecordingStatus('준비'), 3000);
+                } catch (error) {
+                    console.error('GIF 다운로드 오류:', error);
+                    this.updateRecordingStatus('GIF 다운로드 실패: ' + error.message);
+                    setTimeout(() => this.updateRecordingStatus('준비'), 2000);
+                } finally {
+                    // 상태 복원
+                    this.isRecordingRealGif = false;
+                    this.downloadVideoBtn.disabled = false;
+                    this.downloadTransparentBtn.disabled = false;
+                    this.downloadGifAnimBtn.disabled = false;
+                    this.downloadGifBtn.disabled = false;
+                    this.pngFormatSelect.disabled = false;
+                    
+                    // 오디오 이벤트 리스너 정리 (안전장치)
+                    try {
+                        this.audioPlayer.removeEventListener('ended', handleGifAudioEnd);
+                    } catch (e) {
+                        console.log('오디오 이벤트 리스너 정리 중 오류:', e);
+                    }
+                }
+            });
+            
+            this.gifRecorder.on('abort', () => {
+                clearTimeout(renderTimeout);
+                console.log('GIF 렌더링 중단됨');
+                renderingFinished = true;
+                this.updateRecordingStatus('GIF 생성이 중단되었습니다.');
+                this.isRecordingRealGif = false;
+                this.downloadVideoBtn.disabled = false;
+                this.downloadTransparentBtn.disabled = false;
+                this.downloadGifAnimBtn.disabled = false;
+                this.downloadGifBtn.disabled = false;
+                this.pngFormatSelect.disabled = false;
+                setTimeout(() => this.updateRecordingStatus('준비'), 2000);
+            });
+            
+            // 렌더링 타임아웃 설정 (30초로 단축)
+            const renderTimeout = setTimeout(() => {
+                if (!renderingFinished && this.isRecordingRealGif) {
+                    console.warn('GIF 렌더링 타임아웃 - 대체 방법 시도');
+                    renderingFinished = true;
+                    
+                    // 대체 방법: 프레임을 WebM으로 변환 후 다운로드
+                    this.updateRecordingStatus('GIF 타임아웃 - WebM으로 변환 중...');
+                    this.fallbackWebMDownload();
+                }
+            }, 30000);
+            
+            
+            this.gifRecorder.on('progress', (progress) => {
+                const percent = Math.round(progress * 100);
+                this.updateRecordingStatus(`GIF 생성 중... ${percent}%`);
+            });
+            
+            // 프레임 캡처 설정
+            const frameRate = 10; // 10fps (GIF 최적화)
+            const frameDuration = 1000 / frameRate;
+            const maxDuration = this.audioPlayer.duration * 1000; // 전체 음악 길이
+            let capturedDuration = 0;
+            let frameCount = 0;
+            
+            // 오디오 종료 시 자동으로 GIF 렌더링 완료 처리
+            const handleGifAudioEnd = () => {
+                console.log('오디오 종료됨, GIF 렌더링 시작, frameCount:', frameCount);
+                this.audioPlayer.removeEventListener('ended', handleGifAudioEnd);
+                
+                if (this.isRecordingRealGif && frameCount > 0) {
+                    console.log(`렌더링 시작: ${frameCount}개 프레임`);
+                    this.updateRecordingStatus(`GIF 렌더링 중... (${frameCount}프레임 처리)`);
+                    
+                    // 최소 프레임 수 체크
+                    if (frameCount < 5) {
+                        console.warn('프레임 수가 너무 적음:', frameCount);
+                        this.updateRecordingStatus('프레임이 너무 적어 GIF를 생성할 수 없습니다.');
+                        this.isRecordingRealGif = false;
+                        this.downloadVideoBtn.disabled = false;
+                        this.downloadTransparentBtn.disabled = false;
+                        this.downloadGifAnimBtn.disabled = false;
+                        this.downloadGifBtn.disabled = false;
+                        this.pngFormatSelect.disabled = false;
+                        setTimeout(() => this.updateRecordingStatus('준비'), 2000);
+                        return;
+                    }
+                    
+                    try {
+                        // 강제로 렌더링 시작
+                        console.log('GIF 렌더링 호출');
+                        this.gifRecorder.render();
+                        
+                        // 렌더링 시작 확인용 타이머
+                        setTimeout(() => {
+                            if (!renderingFinished) {
+                                console.log('렌더링 진행 중 확인...');
+                            }
+                        }, 5000);
+                        
+                    } catch (error) {
+                        console.error('GIF 렌더링 호출 오류:', error);
+                        this.updateRecordingStatus('GIF 렌더링 실패: ' + error.message);
+                        this.isRecordingRealGif = false;
+                        this.downloadVideoBtn.disabled = false;
+                        this.downloadTransparentBtn.disabled = false;
+                        this.downloadGifAnimBtn.disabled = false;
+                        this.downloadGifBtn.disabled = false;
+                        this.pngFormatSelect.disabled = false;
+                        setTimeout(() => this.updateRecordingStatus('준비'), 2000);
+                    }
+                } else {
+                    console.log('GIF 녹화 상태 이상:', this.isRecordingRealGif, 'frameCount:', frameCount);
+                    this.updateRecordingStatus('GIF 생성 실패 - 프레임 없음');
+                    this.isRecordingRealGif = false;
+                    this.downloadVideoBtn.disabled = false;
+                    this.downloadTransparentBtn.disabled = false;
+                    this.downloadGifAnimBtn.disabled = false;
+                    this.downloadGifBtn.disabled = false;
+                    this.pngFormatSelect.disabled = false;
+                    setTimeout(() => this.updateRecordingStatus('준비'), 2000);
+                }
+            };
+            
+            const captureFrame = () => {
+                if (!this.isRecordingRealGif) {
+                    console.log('GIF 녹화 중단됨');
+                    return;
+                }
+                
+                // 시간 기반으로 종료 체크 (더 안정적)
+                if (capturedDuration >= maxDuration) {
+                    console.log('최대 지속시간 도달, GIF 렌더링 시작, frameCount:', frameCount);
+                    this.audioPlayer.removeEventListener('ended', handleGifAudioEnd);
+                    
+                    if (frameCount > 0) {
+                        // 최소 프레임 수 체크
+                        if (frameCount < 5) {
+                            console.warn('프레임 수가 너무 적음:', frameCount);
+                            this.updateRecordingStatus('프레임이 너무 적어 GIF를 생성할 수 없습니다.');
+                            this.isRecordingRealGif = false;
+                            this.downloadVideoBtn.disabled = false;
+                            this.downloadTransparentBtn.disabled = false;
+                            this.downloadGifAnimBtn.disabled = false;
+                            this.downloadGifBtn.disabled = false;
+                            this.pngFormatSelect.disabled = false;
+                            setTimeout(() => this.updateRecordingStatus('준비'), 2000);
+                            return;
+                        }
+                        
+                        this.updateRecordingStatus(`GIF 렌더링 중... (${frameCount}프레임 처리)`);
+                        try {
+                            console.log('GIF 렌더링 호출 (시간 기반)');
+                            this.gifRecorder.render();
+                        } catch (error) {
+                            console.error('GIF 렌더링 오류:', error);
+                            this.updateRecordingStatus('GIF 렌더링 실패: ' + error.message);
+                            this.isRecordingRealGif = false;
+                            this.downloadVideoBtn.disabled = false;
+                            this.downloadTransparentBtn.disabled = false;
+                            this.downloadGifAnimBtn.disabled = false;
+                            this.downloadGifBtn.disabled = false;
+                            this.pngFormatSelect.disabled = false;
+                            setTimeout(() => this.updateRecordingStatus('준비'), 2000);
+                        }
+                    } else {
+                        console.log('프레임이 없어서 GIF를 생성할 수 없음');
+                        this.updateRecordingStatus('GIF 생성 실패 - 프레임 없음');
+                        this.isRecordingRealGif = false;
+                        this.downloadVideoBtn.disabled = false;
+                        this.downloadTransparentBtn.disabled = false;
+                        this.downloadGifAnimBtn.disabled = false;
+                        this.downloadGifBtn.disabled = false;
+                        this.pngFormatSelect.disabled = false;
+                        setTimeout(() => this.updateRecordingStatus('준비'), 2000);
+                    }
+                    return;
+                }
+                
+                try {
+                    // Canvas가 그려져 있는지 확인
+                    const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+                    const data = imageData.data;
+                    let hasContent = false;
+                    
+                    // 픽셀 데이터 확인 (모두 검은색이 아닌지)
+                    for (let i = 0; i < data.length; i += 4) {
+                        if (data[i] !== 0 || data[i + 1] !== 0 || data[i + 2] !== 0) {
+                            hasContent = true;
+                            break;
+                        }
+                    }
+                    
+                    if (hasContent) {
+                        // GIF 크기가 Canvas와 다른 경우 리사이징을 위한 임시 Canvas 생성
+                        let frameCanvas = this.canvas;
+                        const gifWidth = Math.min(this.canvas.width, 800);
+                        const gifHeight = Math.min(this.canvas.height, 600);
+                        
+                        if (this.canvas.width !== gifWidth || this.canvas.height !== gifHeight) {
+                            frameCanvas = document.createElement('canvas');
+                            frameCanvas.width = gifWidth;
+                            frameCanvas.height = gifHeight;
+                            const frameCtx = frameCanvas.getContext('2d', { 
+                                willReadFrequently: false,
+                                alpha: true 
+                            });
+                            frameCtx.drawImage(this.canvas, 0, 0, gifWidth, gifHeight);
+                        }
+                        
+                        // 현재 캔버스 프레임을 GIF에 추가
+                        this.gifRecorder.addFrame(frameCanvas, { delay: frameDuration });
+                        frameCount++;
+                        
+                        console.log(`프레임 ${frameCount} 추가됨`);
+                    } else {
+                        console.log('빈 프레임 스킵됨');
+                    }
+                    
+                    capturedDuration += frameDuration;
+                    const progress = Math.min(capturedDuration / maxDuration, 1);
+                    this.updateRecordingStatus(`프레임 캡처 중... ${Math.round(progress * 100)}% (${frameCount}프레임)`);
+                    
+                    // 다음 프레임 스케줄링
+                    setTimeout(captureFrame, frameDuration);
+                } catch (error) {
+                    console.error('GIF 프레임 캡처 오류:', error);
+                    this.updateRecordingStatus('GIF 캡처 오류 발생: ' + error.message);
+                    this.isRecordingRealGif = false;
+                    this.downloadVideoBtn.disabled = false;
+                    this.downloadTransparentBtn.disabled = false;
+                    this.downloadGifAnimBtn.disabled = false;
+                    this.downloadGifBtn.disabled = false;
+                    this.pngFormatSelect.disabled = false;
+                    this.audioPlayer.removeEventListener('ended', handleGifAudioEnd);
+                }
+            };
+            
+            // 오디오 종료 이벤트 리스너 등록
+            this.audioPlayer.addEventListener('ended', handleGifAudioEnd);
+            
+            // 오디오를 처음부터 재생
+            this.audioPlayer.currentTime = 0;
+            await this.play();
+            
+            // 첫 프레임 캡처 시작 (재생 시작 후 잠시 대기)
+            setTimeout(captureFrame, 200);
+            
+        } catch (error) {
+            console.error('GIF 생성 오류:', error);
+            this.updateRecordingStatus('GIF 생성 실패: ' + error.message);
+            this.isRecordingRealGif = false;
+            this.downloadVideoBtn.disabled = false;
+            this.downloadTransparentBtn.disabled = false;
+            this.downloadGifAnimBtn.disabled = false;
+            this.downloadGifBtn.disabled = false;
+            this.pngFormatSelect.disabled = false;
+            setTimeout(() => this.updateRecordingStatus('준비'), 2000);
+        }
+    }
+    
+    // 대체 WebM 다운로드 방법
+    async fallbackWebMDownload() {
+        try {
+            console.log('대체 WebM 다운로드 시작');
+            this.updateRecordingStatus('투명 배경 WebM 영상으로 변환 중...');
+            
+            // 기존 투명 영상 다운로드 방법 사용
+            await this.downloadVideo(true);
+            
+            this.updateRecordingStatus('WebM 영상 다운로드 완료 (GIF 대체)');
+            setTimeout(() => this.updateRecordingStatus('준비'), 3000);
+            
+        } catch (error) {
+            console.error('대체 다운로드 실패:', error);
+            this.updateRecordingStatus('다운로드 실패 - 다시 시도해주세요');
+            setTimeout(() => this.updateRecordingStatus('준비'), 2000);
+        } finally {
+            this.isRecordingRealGif = false;
+            this.downloadVideoBtn.disabled = false;
+            this.downloadTransparentBtn.disabled = false;
+            this.downloadGifAnimBtn.disabled = false;
+            this.downloadGifBtn.disabled = false;
+            this.pngFormatSelect.disabled = false;
+        }
+    }
 }
 
+// 애플리케이션 초기화
 window.addEventListener('DOMContentLoaded', () => {
-    new MusicVisualizer();
+    try {
+        new MusicVisualizer();
+    } catch (error) {
+        console.error('음악 시각화 도구 초기화 오류:', error);
+        // 사용자에게 친화적인 오류 메시지 표시
+        document.body.innerHTML = `
+            <div style="
+                display: flex; 
+                justify-content: center; 
+                align-items: center; 
+                height: 100vh; 
+                background: linear-gradient(135deg, #1e3c72, #2a5298);
+                color: white; 
+                font-family: Arial, sans-serif;
+                text-align: center;
+                padding: 20px;
+            ">
+                <div>
+                    <h1>음악 시각화 도구 로딩 오류</h1>
+                    <p>페이지를 새로고침하거나 다른 브라우저를 사용해보세요.</p>
+                    <p style="font-size: 0.9rem; color: #ccc; margin-top: 15px;">
+                        브라우저: ${compatibilityCheck.browserInfo.name} ${compatibilityCheck.browserInfo.version}
+                    </p>
+                    <button onclick="window.location.reload()" style="
+                        padding: 10px 20px; 
+                        background: #4ecdc4; 
+                        border: none; 
+                        border-radius: 5px; 
+                        color: white; 
+                        cursor: pointer;
+                        font-size: 16px;
+                        margin-top: 20px;
+                    ">페이지 새로고침</button>
+                </div>
+            </div>
+        `;
+    }
 });
+
+} catch (globalError) {
+    console.error('전역 애플리케이션 오류:', globalError);
+    // 전역 오류 발생 시 최후 안전장치
+    document.addEventListener('DOMContentLoaded', () => {
+        document.body.innerHTML = `
+            <div style="
+                display: flex; 
+                justify-content: center; 
+                align-items: center; 
+                height: 100vh; 
+                background: linear-gradient(135deg, #1e3c72, #2a5298);
+                color: white; 
+                font-family: Arial, sans-serif;
+                text-align: center;
+                padding: 20px;
+            ">
+                <div>
+                    <h1>🚫 애플리케이션 로딩 실패</h1>
+                    <p>현재 브라우저에서는 이 애플리케이션을 실행할 수 없습니다.</p>
+                    <p style="font-size: 0.9rem; color: #ccc; margin-top: 15px;">
+                        Chrome, Firefox, Edge 등 최신 브라우저를 사용해주세요.
+                    </p>
+                    <button onclick="window.location.reload()" style="
+                        padding: 10px 20px; 
+                        background: #4ecdc4; 
+                        border: none; 
+                        border-radius: 5px; 
+                        color: white; 
+                        cursor: pointer;
+                        font-size: 16px;
+                        margin-top: 20px;
+                    ">다시 시도</button>
+                </div>
+            </div>
+        `;
+    });
+}

@@ -31,6 +31,71 @@ h1 {
     margin-bottom: 10px;
 }
 
+.zoom-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: stretch;
+}
+
+.zoom-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.zoom-buttons .btn {
+    min-width: 35px;
+    padding: 6px 10px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.zoom-slider-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.zoom-slider-container label {
+    font-size: 0.9rem;
+    color: #ccc;
+    white-space: nowrap;
+}
+
+.zoom-slider-container .slider-inline {
+    flex: 1;
+    min-width: 120px;
+    max-width: 200px;
+}
+
+.zoom-number-input {
+    width: 70px;
+    padding: 4px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    text-align: center;
+    font-size: 12px;
+}
+
+.zoom-number-input:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.zoom-hint {
+    font-size: 0.75rem;
+    color: #999;
+    text-align: center;
+    font-style: italic;
+    margin-top: 5px;
+}
+
 .control-panel {
     background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
@@ -129,6 +194,51 @@ h1 {
 .transparent-btn {
     background: linear-gradient(45deg, #a855f7, #8b5cf6);
     color: white;
+}
+
+.gif-btn {
+    background: linear-gradient(45deg, #f97316, #ea580c);
+    color: white;
+}
+
+.gif-anim-btn {
+    background: linear-gradient(45deg, #10b981, #059669);
+    color: white;
+}
+
+.png-download-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.png-format-select {
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 0.9rem;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    min-width: 160px;
+}
+
+.png-format-select:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.png-format-select option {
+    background: #2a3142;
+    color: white;
+}
+
+.png-format-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .visualizer-container {
